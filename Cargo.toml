@@ -1,6 +1,6 @@
 [package]
 name = "vnetctl"
-version = "0.10.1"
+version = "0.10.7"
 edition = "2021"
 description = "Manage Parallels Windows guest network forwarding from macOS"
 license = "MIT"

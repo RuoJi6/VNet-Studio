@@ -11,6 +11,7 @@ mod hostforward;
 
 const HELP: &str = r#"vnetctl — Parallels 跨系统虚拟机网络管理
 
+vnetctl-cli --version
 vnetctl host-forward list
 vnetctl host-forward add --listen 127.0.0.1:18787 --target 10.211.55.18:8787 [--vm NAME]
 vnetctl host-forward start|stop|delete|check --listen 127.0.0.1:18787
@@ -335,6 +336,10 @@ fn route_config(a: &Args) -> Result<serde_json::Value, String> {
 }
 fn run() -> Result<(), String> {
     let raw = env::args().skip(1).collect::<Vec<_>>();
+    if raw == ["--version"] || raw == ["-V"] {
+        println!("vnetctl-cli {}", env!("CARGO_PKG_VERSION"));
+        return Ok(());
+    }
     if raw.is_empty() || raw.iter().any(|s| s == "--help" || s == "-h") {
         print!("{HELP}");
         return Ok(());

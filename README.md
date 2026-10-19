@@ -1,6 +1,21 @@
-# VNet Studio 0.10.6
+# VNet Studio 0.10.7
 
-macOS 上的 Tauri 2 + Vue 3 图形化工具，用来管理 Parallels 内的 Windows、Linux 和 macOS 虚拟机。桌面应用目前只构建了 macOS Apple Silicon 版本；这里的跨系统支持指来宾操作系统。
+macOS 上的 Tauri 2 + Vue 3 图形化工具，用来管理 Parallels 内的 Windows、Linux 和 macOS 虚拟机。提供 macOS Apple Silicon（ARM64）和 Intel（AMD64 / x86_64）的 GUI 与独立 CLI 发行包；Windows、Linux 和 macOS 来宾功能取决于对应执行通道。
+
+## 0.10.7：自动发布 GUI 与 CLI
+
+GitHub Actions 在主分支更新和 PR 时测试、构建两个 macOS 架构；推送版本标签后，两个架构全部成功才自动发布 GitHub Release。发行包含四份资产和 SHA-256 校验文件：
+
+| 架构 | GUI | 独立 CLI |
+|---|---|---|
+| Apple Silicon / ARM64 | `VNet-Studio-0.10.7-macOS-arm64.zip` | `vnetctl-cli-0.10.7-macOS-arm64.tar.gz` |
+| Intel / AMD64 / x86_64 | `VNet-Studio-0.10.7-macOS-x86_64.zip` | `vnetctl-cli-0.10.7-macOS-x86_64.tar.gz` |
+
+GUI 解压后将 `VNet Studio.app` 放入应用程序，应用内已包含同架构 CLI。独立 CLI 解压后可直接运行 `./vnetctl-cli --help`、`./vnetctl-cli --version`，或将可执行文件复制到 PATH 中的目录。两者均采用 ad-hoc 签名，尚未进行 Apple Developer ID 签名和公证。构建最低目标为 macOS 11，自动化验证运行于 macOS 15；没有在 macOS 11 真机上验证运行。
+
+版本检查会阻止 GUI、CLI、锁文件和标签版本不一致。工作流验证 Rust / Python 测试、前端类型及构建、两个原生可执行文件的架构、CLI 启动和代码签名；不在 CI 中启动 Parallels 或修改真实虚拟机网络。发布步骤先上传全部资产到草稿，再发布，禁止覆盖已发布版本。
+
+发布与本地打包说明见 [RELEASING.md](RELEASING.md)。
 
 <img width="1764" height="1042" alt="image" src="https://github.com/user-attachments/assets/4f0f62e0-e089-4ae5-8ab0-38c8152435f2" />
 

@@ -1,6 +1,6 @@
 [package]
 name = "vnet-studio-desktop"
-version = "0.10.6"
+version = "0.10.7"
 edition = "2021"
 [features]
 custom-protocol = ["tauri/custom-protocol"]

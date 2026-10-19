@@ -1,5 +1,6 @@
 # Rust / frontend build output
 /target/
+/dist/
 /desktop/node_modules/
 /desktop/dist/
 /desktop/src-tauri/target/

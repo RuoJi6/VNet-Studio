@@ -1,0 +1,187 @@
+name: macOS build and release
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Existing version tag to publish, for example v0.10.7'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: macos-${{ github.workflow }}-${{ inputs.tag || github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  metadata:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      tag: ${{ steps.version.outputs.tag }}
+      commit: ${{ steps.version.outputs.commit }}
+      publish: ${{ steps.version.outputs.publish }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag || github.ref }}
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Validate versions and release tag
+        id: version
+        env:
+          EVENT: ${{ github.event_name }}
+          REF_TYPE: ${{ github.ref_type }}
+          REF_NAME: ${{ github.ref_name }}
+          INPUT_TAG: ${{ inputs.tag }}
+        run: |
+          version=$(python3 scripts/version.py)
+          tag="v$version"
+          publish=false
+          if [[ "$EVENT" == workflow_dispatch ]]; then
+            python3 scripts/version.py --tag "$INPUT_TAG"
+            tag="$INPUT_TAG"
+            publish=true
+          elif [[ "$REF_TYPE" == tag ]]; then
+            python3 scripts/version.py --tag "$REF_NAME"
+            tag="$REF_NAME"
+            publish=true
+          fi
+          commit=$(git rev-parse HEAD)
+          if [[ "$publish" == true ]]; then
+            test "$(git rev-parse "refs/tags/$tag^{commit}")" = "$commit"
+          fi
+          {
+            echo "version=$version"
+            echo "tag=$tag"
+            echo "commit=$commit"
+            echo "publish=$publish"
+          } >> "$GITHUB_OUTPUT"
+
+  build:
+    needs: metadata
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: macos-15
+            target: aarch64-apple-darwin
+            arch: arm64
+          - runner: macos-15-intel
+            target: x86_64-apple-darwin
+            arch: x86_64
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 60
+    env:
+      CARGO_TARGET_DIR: ${{ github.workspace }}/target
+      VNET_BUILD_TARGET: ${{ matrix.target }}
+      MACOSX_DEPLOYMENT_TARGET: '11.0'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.metadata.outputs.commit }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: pnpm/action-setup@v4
+        with:
+          package_json_file: desktop/package.json
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: pnpm
+          cache-dependency-path: desktop/pnpm-lock.yaml
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            . -> target
+            desktop/src-tauri -> ../../target
+          key: ${{ matrix.target }}
+      - name: Test CLI and guest helpers
+        run: |
+          cargo test --locked --bin vnetctl-cli --target "$VNET_BUILD_TARGET"
+          python3 -m unittest discover -s guest -p 'test_*.py'
+      - name: Build and verify GUI and CLI archives
+        run: bash scripts/build-release.sh
+      - uses: actions/upload-artifact@v4
+        with:
+          name: macOS-${{ matrix.arch }}
+          path: |
+            dist/*.zip
+            dist/*.tar.gz
+          if-no-files-found: error
+          retention-days: 14
+
+  release:
+    needs: [metadata, build]
+    if: needs.metadata.outputs.publish == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: macOS-*
+          merge-multiple: true
+          path: release
+      - name: Verify complete artifact set and generate checksums
+        working-directory: release
+        env:
+          VERSION: ${{ needs.metadata.outputs.version }}
+        run: |
+          for arch in arm64 x86_64; do
+            test -s "VNet-Studio-$VERSION-macOS-$arch.zip"
+            test -s "vnetctl-cli-$VERSION-macOS-$arch.tar.gz"
+          done
+          test "$(find . -maxdepth 1 -type f | wc -l)" -eq 4
+          sha256sum ./*.zip ./*.tar.gz > SHA256SUMS.txt
+      - name: Publish GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ needs.metadata.outputs.tag }}
+          VERSION: ${{ needs.metadata.outputs.version }}
+        run: |
+          cat > RELEASE_NOTES.md <<EOF
+          macOS GUI 与独立 CLI，分别提供 Apple Silicon（arm64）和 Intel / AMD64（x86_64）版本。
+
+          | 下载文件 | 用途 |
+          | --- | --- |
+          | VNet-Studio-$VERSION-macOS-arm64.zip | Apple Silicon GUI，解压后将 VNet Studio.app 放入应用程序 |
+          | VNet-Studio-$VERSION-macOS-x86_64.zip | Intel Mac GUI，包含同架构 CLI |
+          | vnetctl-cli-$VERSION-macOS-arm64.tar.gz | Apple Silicon 独立命令行 |
+          | vnetctl-cli-$VERSION-macOS-x86_64.tar.gz | Intel Mac 独立命令行 |
+
+          CLI 解压后运行 ./vnetctl-cli --help，可将可执行文件安装到 PATH 目录。
+          下载所有资产后可运行 shasum -a 256 -c SHA256SUMS.txt 校验。
+          虚拟机管理需要 Parallels Desktop 和可用的 Parallels Tools；Mac 本地转发无需 Parallels。
+          产物采用 ad-hoc 签名，尚未进行 Apple Developer ID 签名和公证。
+          两个架构均通过 CLI / 来宾辅助程序测试、前端及原生构建、Mach-O 架构与签名检查；CI 不包含真实 Parallels 来宾端到端验证。
+          EOF
+          if state=$(gh release view "$RELEASE_TAG" --json isDraft --jq .isDraft 2>/dev/null); then
+            if [[ "$state" != true ]]; then
+              echo "Release $RELEASE_TAG is already published; refusing to replace its assets." >&2
+              exit 1
+            fi
+          else
+            gh release create "$RELEASE_TAG" --verify-tag --draft \
+              --title "VNet Studio $VERSION" --generate-notes --notes-file RELEASE_NOTES.md
+          fi
+          gh release upload "$RELEASE_TAG" release/* --clobber
+          if [[ "$VERSION" == *-* ]]; then
+            gh release edit "$RELEASE_TAG" --draft=false --prerelease
+          else
+            gh release edit "$RELEASE_TAG" --draft=false --latest
+          fi
