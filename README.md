@@ -2,6 +2,9 @@
 
 macOS 上的 Tauri 2 + Vue 3 图形化工具，用来管理 Parallels 内的 Windows、Linux 和 macOS 虚拟机。桌面应用目前只构建了 macOS Apple Silicon 版本；这里的跨系统支持指来宾操作系统。
 
+<img width="1764" height="1042" alt="image" src="https://github.com/user-attachments/assets/4f0f62e0-e089-4ae5-8ab0-38c8152435f2" />
+
+
 ## 0.10.6：连接日志分页
 
 端口转发与 SOCKS5 规则的连接日志默认每页 10 条，可选择 20 或 50 条，并通过首页、上一页、下一页和末页浏览。分页栏显示当前范围与页码。历史页保持浏览快照，五秒自动刷新不会打乱记录；有更新时可点击“回到最新”。切换规则重置分页，空记录显示明确提示。同时修复日志页签被撑成竖向长条的问题。分页针对后台返回的最近日志（Mac 与 Linux 后台最多保留最近 200 条），不表示完整归档检索。
