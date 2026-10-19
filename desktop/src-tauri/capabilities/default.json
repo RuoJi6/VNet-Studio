@@ -1,0 +1,1 @@
+{"identifier":"default","description":"Only the bundled VNet Studio window may invoke local management commands.","windows":["main"],"permissions":["core:default"]}

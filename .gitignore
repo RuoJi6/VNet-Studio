@@ -1,0 +1,22 @@
+# Rust / frontend build output
+/target/
+/desktop/node_modules/
+/desktop/dist/
+/desktop/src-tauri/target/
+/desktop/src-tauri/gen/schemas/
+.pnpm-store/
+
+# Local caches, settings and connection logs
+.DS_Store
+__pycache__/
+*.py[cod]
+.env
+.env.*
+!.env.example
+*.log
+*.events
+*.events.1
+.vnetstudio/
+.vnetstudio-host/
+*.pem
+*.key

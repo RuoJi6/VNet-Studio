@@ -1,0 +1,24 @@
+[package]
+name = "vnetctl"
+version = "0.10.1"
+edition = "2021"
+description = "Manage Parallels Windows guest network forwarding from macOS"
+license = "MIT"
+default-run = "vnetctl"
+
+[[bin]]
+name = "vnetctl-cli"
+path = "src/main.rs"
+
+[[bin]]
+name = "vnetctl"
+path = "src/gui.rs"
+
+[dependencies]
+eframe = { version = "0.31", default-features = false, features = ["default_fonts", "glow"] }
+serde_json = "1"
+libc = "0.2"
+
+[profile.release]
+strip = true
+lto = true
